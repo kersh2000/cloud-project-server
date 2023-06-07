@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const { Palette, User, sequeluze } = require('./models');
 
 const { sequelize } = require('./db/db');
 const seed = require('./db/seedFn');
@@ -15,6 +16,11 @@ app.get('/api', (req, res) => {
   res.status(200).send({
     "data": ["userOne", "userTwo", "userThree"]
   });
+});
+
+app.get('/users', async (req, res) => {
+  const users = await User.findAll();
+  res.status(200).send(users);
 });
 
 app.get('/seed', async (req, res) => {
