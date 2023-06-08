@@ -143,13 +143,37 @@ app.get('/users/:userId/palettes', verifyUserById, async (req, res) => {
 // Get all public palettes endpoint
 app.get('/palettes/public', async (req, res) => {
   try {
-    const palettes = await Palette.findAll({where: {public: 1}});
-    res.status(200).send(palettes);
+    const publicPalettes = await Palette.findAll({
+      where: {
+        public: true
+      },
+      include: [
+        {
+          model: User,
+          attributes: ['username']
+        }
+      ]
+    });
+
+    const formattedPalettes = publicPalettes.map((palette) => {
+      const { id, title, description, colours, public, user } = palette;
+      return {
+        id,
+        title,
+        description,
+        colours,
+        public,
+        creator: user.username
+      };
+    });
+
+    res.status(200).send(formattedPalettes);
   } catch (error) {
     console.error(error);
     res.status(400).send({ message: 'Unable to fetch public palettes' });
   }
 });
+
 
 app.listen(PORT, () => {
   sequelize.sync({ force: false });
