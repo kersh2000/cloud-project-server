@@ -9,8 +9,9 @@ const app = express();
 
 const { PORT = 5000 } = process.env;
 
+app.use(cors({origin: '*'}));
+
 app.use(express.json());
-app.use(cors({origin: 'https://cloud-project-client.onrender.com'}));
 
 app.get('/api', (req, res) => {
   res.status(200).send({
