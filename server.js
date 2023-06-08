@@ -1,17 +1,17 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
-const { Palette, User, sequeluze } = require('./models');
-
-const { sequelize } = require('./db/db');
+const { Palette, User, sequelize } = require('./models');
 const seed = require('./db/seedFn');
-const app = express();
+const { verifyUser, verifyNewUser, verifyUserById } = require('./middleware/checkUser');
+const { verifyPaletteById } = require('./middleware/checkPalette');
 
+const app = express();
 const { PORT = 5000 } = process.env;
 
-app.use(cors({origin: '*'}));
+app.use(cors());
 app.use(express.json());
 
+// Welcome page
 app.get('/', (req, res) => {
   const title = 'Welcome to Colour Palette API';
 
@@ -35,7 +35,6 @@ app.get('/', (req, res) => {
         -webkit-text-fill-color: transparent;
         text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
       }
-
     </style>
   `;
 
@@ -54,17 +53,7 @@ app.get('/', (req, res) => {
   res.send(html);
 });
 
-app.get('/api', (req, res) => {
-  res.status(200).send({
-    "data": ["userOne", "userTwo", "userThree"]
-  });
-});
-
-app.get('/users', async (req, res) => {
-  const users = await User.findAll();
-  res.status(200).send(users);
-});
-
+// Seed data endpoint
 app.get('/seed', async (req, res) => {
   try {
     await seed();
@@ -75,7 +64,94 @@ app.get('/seed', async (req, res) => {
   }
 });
 
+// Login endpoint
+app.post('/login', verifyUser, async (req, res) => {
+  const { username, password } = req.body;
+  if (username && password) {
+    if (req.user.password === password) {
+      res.status(200).send({ message: 'Login successful', id: req.user.id });
+    } else {
+      res.status(400).send({ message: 'Invalid details' });
+    }
+  } else {
+    res.status(400).send({ message: 'Invalid credentials' });
+  }
+});
+
+// Register new user endpoint
+app.post('/register', verifyNewUser, async (req, res) => {
+  const { username, password } = req.body;
+  if (username && password) {
+    const {id} = await User.create({username, password});
+    res.status(201).send({ message: 'User registered successfully', id: id });
+  } else {
+    res.status(400).send({ message: 'Invalid registration details'});
+  }
+});
+
+// Create palette for a user endpoint
+app.post('/users/:userId/palettes', verifyUserById, async (req, res) => {
+  const { title, description, colours, public } = req.body;
+  if (title && description && colours && public) {
+    try {
+      const palette = await Palette.create({title, description, colours, public});
+      await palette.setUser(req.user);
+      res.status(201).send({ message: 'Palette created successfully' });
+    } catch (error) {
+      res.status(400).send({ message: 'Invalid palette details' })
+      console.error(error)
+    }
+  } else {
+    res.status(400).send({ message: 'Missing palette details' });
+  }
+});
+
+// Edit a palette for a user endpoint
+app.put('/users/:userId/palettes/:paletteId', verifyPaletteById, verifyUserById, async (req, res) => {
+  const { title, description, colours, public } = req.body;
+  if (title && description && colours && public) {
+    try {
+      await req.palette.update({
+        title, description, colours, public
+      });
+      res.status(201).send({ message: 'Palette successfully updated' });
+    } catch (error) {
+      res.status(400).send({ message: 'Invalid palette details' })
+      console.error(error)
+    }
+  } else {
+    res.status(400).send({ message: 'Missing palette details' });
+  }
+});
+
+// Delete a palette for a user endpoint
+app.delete('/users/:userId/palettes/:paletteId', verifyPaletteById, verifyUserById, async (req, res) => {
+  try {
+    await req.palette.destroy();
+    res.status(200).send({ message: 'Palette deleted successfully' });
+  } catch {
+    res.status(400).send({ message: 'Unable to delete palette' })
+  }
+});
+
+// Get a user's palettes endpoint
+app.get('/users/:userId/palettes', verifyUserById, async (req, res) => {
+  const palettes = await req.user.getPalettes();
+  res.status(200).send(palettes);
+});
+
+// Get all public palettes endpoint
+app.get('/palettes/public', async (req, res) => {
+  try {
+    const palettes = await Palette.findAll({where: {public: 1}});
+    res.status(200).send(palettes);
+  } catch (error) {
+    console.error(error);
+    res.status(400).send({ message: 'Unable to fetch public palettes' });
+  }
+});
+
 app.listen(PORT, () => {
-  sequelize.sync({ force: false});
-  console.log(`Listening on port ${PORT}...`)
+  sequelize.sync({ force: false });
+  console.log(`Listening on port ${PORT}...`);
 });
