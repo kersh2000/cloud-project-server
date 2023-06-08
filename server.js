@@ -8,7 +8,7 @@ const { verifyPaletteById } = require('./middleware/checkPalette');
 const app = express();
 const { PORT = 5000 } = process.env;
 
-app.use(cors());
+app.use(cors({ origin: '*', exposedHeaders: '*' }));
 app.use(express.json());
 
 // Welcome page
